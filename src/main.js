@@ -34,8 +34,13 @@ const KEY_RATE = 2.1;
 const TAP_RATE = 2.1;
 const TAP_EASE_TAU = 0.1;
 const CONTROL_KEY = "gyro-tunnel-control";
-const HINT_GYRO = "Tilt the phone like a steering wheel · on desktop, use arrows or the mouse";
-const HINT_TAP = "Hold the sides to turn · hold the middle to boost";
+const HINT_GYRO = "Tilt the phone like a steering wheel · stay steady to boost";
+const HINT_TAP = "Hold the sides to turn · stay steady to boost";
+const AUTO_BOOST_DELAY = 2;
+// Smoothed |d(targetRoll)/dt| below this counts as holding still (sensor noise).
+const AUTO_BOOST_RATE_DEG = 8;
+const AUTO_BOOST_RATE_RAD = (AUTO_BOOST_RATE_DEG * Math.PI) / 180;
+const STEER_RATE_TAU = 0.12;
 
 function motionApiAvailable() {
   return typeof DeviceMotionEvent !== "undefined";
@@ -260,7 +265,10 @@ const state = {
   displayedKmh: -1,
   growthTime: 0,
   boosting: false,
-  boostKey: false,
+  autoBoost: false,
+  steerIdleT: 0,
+  steerRate: 0,
+  prevTargetRoll: 0,
   flame: 0,
   lens: 0,
   displayedLens: -1,
@@ -397,8 +405,6 @@ const barPool = [];
 const pickups = [];
 const pickupPool = [];
 
-const boostPointers = new Set();
-
 const clock = new THREE.Clock(false);
 const _vec = new THREE.Vector3();
 const fpsMeter = { frames: 0, start: 0 };
@@ -474,8 +480,51 @@ function mountExhaust(parent) {
   exhaust = { group, outer, mid, core };
 }
 
+function hasDirectSteerInput() {
+  return !!(
+    state.keys.left ||
+    state.keys.right ||
+    tapLeftHeld() ||
+    tapRightHeld() ||
+    state.pointerDragging
+  );
+}
+
+function isSteering() {
+  if (hasDirectSteerInput()) return true;
+  if (!isTapMode()) return state.steerRate > AUTO_BOOST_RATE_RAD;
+  return false;
+}
+
+function updateSteerRate(dt) {
+  const inst = Math.abs(wrapAngle(state.targetRoll - state.prevTargetRoll)) / Math.max(dt, 1e-4);
+  const k = 1 - Math.exp(-Math.max(dt, 0) / STEER_RATE_TAU);
+  state.steerRate += (inst - state.steerRate) * k;
+  if (state.steerRate < 1e-4) state.steerRate = 0;
+  state.prevTargetRoll = state.targetRoll;
+}
+
+function updateAutoBoost(dt) {
+  if (state.mode !== "playing" || state.scoreFrozen) {
+    state.autoBoost = false;
+    state.steerIdleT = 0;
+    return;
+  }
+  updateSteerRate(dt);
+  if (isSteering()) {
+    state.steerIdleT = 0;
+    state.autoBoost = false;
+    return;
+  }
+  state.steerIdleT += dt;
+  if (!state.autoBoost && state.steerIdleT >= AUTO_BOOST_DELAY) {
+    state.autoBoost = true;
+    pushFloatLabel("Auto boost", "is-auto-boost");
+  }
+}
+
 function isBoostHeld() {
-  return state.mode === "playing" && (boostPointers.size > 0 || state.boostKey);
+  return state.mode === "playing" && !!state.autoBoost;
 }
 
 function setBoostHud(active) {
@@ -483,8 +532,9 @@ function setBoostHud(active) {
 }
 
 function clearBoostInput() {
-  boostPointers.clear();
-  state.boostKey = false;
+  state.autoBoost = false;
+  state.steerIdleT = 0;
+  state.steerRate = 0;
   state.boosting = false;
   setBoostHud(false);
 }
@@ -2144,6 +2194,7 @@ function resetWorld() {
   state.roll = 0;
   state.targetRoll = 0;
   state.desktopRoll = 0;
+  state.prevTargetRoll = 0;
   state.tapSteer = 0;
   clearTapPointers();
   state.elapsed = 0;
@@ -2334,13 +2385,14 @@ function checkCollision() {
 function triggerCrash() {
   if (state.mode !== "playing") return;
   freezeRunScore();
+  clearBoostInput();
   audio.crash();
   startExplosion();
 }
 
 function tick(now) {
   requestAnimationFrame(tick);
-  const rawDt = Math.min(0.05, (now - (state.lastFrame || now)) / 1000 || 0.016);
+  const rawDt = Math.min(0.05, Math.max(0, (now - (state.lastFrame || now)) / 1000 || 0.016));
   state.lastFrame = now;
 
   let worldScale = 0.35;
@@ -2364,6 +2416,7 @@ function tick(now) {
       planeLight.position.y = plane.position.y + 0.3;
     }
     if (state.mode === "playing" && !state.scoreFrozen) {
+      updateAutoBoost(rawDt);
       state.elapsed += rawDt;
       applyGrowth(rawDt);
       const metres = state.speed * rawDt * timeScale;
@@ -2425,7 +2478,7 @@ function bindZoomGuards() {
     window.addEventListener(type, block, { passive: false, capture: true });
   }
   // Block pinch-zoom on touchmove, but do not cancel multi-touch touchstart:
-  // left+right zones or a side + the middle boost must still work together.
+  // left+right turn zones must still work together.
   document.addEventListener(
     "touchmove",
     (e) => {
@@ -2494,11 +2547,7 @@ function bindControls() {
     if (e.code === "ArrowRight" || e.code === "KeyD") state.keys.right = true;
     if (e.code === "Space") {
       e.preventDefault();
-      if (state.mode === "start" || state.mode === "over") {
-        if (!e.repeat) onAction();
-      } else if (state.mode === "playing") {
-        state.boostKey = true;
-      }
+      if ((state.mode === "start" || state.mode === "over") && !e.repeat) onAction();
       return;
     }
     if (e.code === "Enter" && (state.mode === "start" || state.mode === "over")) {
@@ -2509,7 +2558,7 @@ function bindControls() {
   window.addEventListener("keyup", (e) => {
     if (e.code === "ArrowLeft" || e.code === "KeyA") state.keys.left = false;
     if (e.code === "ArrowRight" || e.code === "KeyD") state.keys.right = false;
-    if (e.code === "Space") state.boostKey = false;
+    if (e.code === "Space") e.preventDefault();
   });
 
   const onDown = (x) => {
@@ -2530,19 +2579,18 @@ function bindControls() {
   const onPointerDown = (e) => {
     if (state.mode !== "playing") return;
     if (e.target?.closest?.("#action, button, a, #tap-zones, #corner-controls")) return;
+    // Tap mode: the middle of the screen does nothing; sides steer via zones.
+    if (isTapMode()) return;
     e.preventDefault();
-    boostPointers.add(e.pointerId);
     try {
       app.setPointerCapture(e.pointerId);
     } catch {
       // capture is best-effort
     }
-    // In tap mode the lower zones steer; dragging the boost area should not also turn.
-    if (!isTapMode()) onDown(pointerLocalX(e.clientX, e.clientY));
+    onDown(pointerLocalX(e.clientX, e.clientY));
   };
-  const onPointerUp = (e) => {
-    boostPointers.delete(e.pointerId);
-    if (boostPointers.size === 0) onSteerUp();
+  const onPointerUp = () => {
+    onSteerUp();
   };
 
   app.addEventListener("pointerdown", onPointerDown);
@@ -2613,6 +2661,12 @@ function getState() {
     speedKmh: kmhFromFactor(state.speedFactor),
     growthTime: state.growthTime,
     boosting: state.boosting,
+    autoBoost: state.autoBoost,
+    steerIdleT: state.steerIdleT,
+    steerRate: state.steerRate,
+    steerRateDeg: (state.steerRate * 180) / Math.PI,
+    autoBoostDelay: AUTO_BOOST_DELAY,
+    steerDeadzoneDeg: AUTO_BOOST_RATE_DEG,
     muted: audio.isMuted(),
     controlMode: state.controlMode,
     tapLeft: tapLeftHeld(),
@@ -2813,8 +2867,13 @@ window.__gyro = {
     }
   },
   setBoosting: (on) => {
-    state.boostKey = !!on;
+    state.autoBoost = !!on;
+    state.steerIdleT = on ? AUTO_BOOST_DELAY : 0;
     if (state.mode === "playing") syncSpeed();
+  },
+  setTargetRoll: (value) => {
+    state.targetRoll = value;
+    state.desktopRoll = value;
   },
   advance: (seconds) => {
     const dt = Math.max(0, seconds);
