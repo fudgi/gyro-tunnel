@@ -36,7 +36,7 @@ const TAP_EASE_TAU = 0.1;
 const CONTROL_KEY = "gyro-tunnel-control";
 const HINT_GYRO = "Tilt the phone like a steering wheel · stay steady to boost";
 const HINT_TAP = "Hold the sides to turn · stay steady to boost";
-const AUTO_BOOST_DELAY = 2;
+const AUTO_BOOST_DELAY = 1;
 // Smoothed |d(targetRoll)/dt| below this counts as holding still (sensor noise).
 const AUTO_BOOST_RATE_DEG = 8;
 const AUTO_BOOST_RATE_RAD = (AUTO_BOOST_RATE_DEG * Math.PI) / 180;

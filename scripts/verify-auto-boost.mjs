@@ -31,7 +31,7 @@ await page.evaluate(() => window.__gyro.setInvincible(true));
 
 const start = await state();
 if (start.boosting || start.autoBoost) fail("boost should be off at run start");
-if (start.autoBoostDelay !== 2) fail(`delay ${start.autoBoostDelay}`);
+if (start.autoBoostDelay !== 1) fail(`delay ${start.autoBoostDelay}`);
 if (start.steerDeadzoneDeg !== 8) fail(`deadzone ${start.steerDeadzoneDeg}`);
 
 // Middle of the screen and Space must not engage boost.
@@ -48,7 +48,7 @@ if (spaceHold.boosting) fail("Space should not boost");
 await page.keyboard.up("Space");
 if (spaceHold.steerIdleT <= 0) fail("idle timer should keep counting during non-steer taps");
 
-// Idle 2s → auto boost, with the English cue.
+// Idle 1s → auto boost, with the English cue.
 await page.waitForFunction(() => window.__gyro.getState().boosting === true, { timeout: 4000 });
 const autoOn = await state();
 if (!autoOn.autoBoost) fail("autoBoost flag should be set");
@@ -66,13 +66,13 @@ const stillTurning = await state();
 if (stillTurning.boosting) fail("boost stayed on while holding a turn");
 await page.keyboard.up("ArrowLeft");
 
-// After release, need another full 2s. A short wait must not re-enable it.
-await page.waitForTimeout(800);
+// After release, need another full 1s. A short wait must not re-enable it.
+await page.waitForTimeout(450);
 const midWait = await state();
-if (midWait.boosting) fail("boost came back before 2s of idle");
+if (midWait.boosting) fail("boost came back before 1s of idle");
 await page.waitForFunction(() => window.__gyro.getState().boosting === true, { timeout: 4000 });
 const autoOn2 = await state();
-if (!autoOn2.autoBoost) fail("auto-boost should return after another 2s idle");
+if (!autoOn2.autoBoost) fail("auto-boost should return after another 1s idle");
 
 // Gyro: stay still → boost; a changing targetRoll above 8°/s cancels it.
 await page.evaluate(() => window.__gyro.setControlMode("gyro"));
