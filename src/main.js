@@ -2218,7 +2218,7 @@ function startGame({ recalibrate = true } = {}) {
 
 async function onAction() {
   actionButton.disabled = true;
-  void audio.unlock();
+  await audio.unlock();
   if (state.mode === "start" || state.mode === "over") {
     if (isTapMode() || !motionApiAvailable()) {
       if (!motionApiAvailable() && !isTapMode()) setControlMode("tap", { persist: true });
@@ -2798,6 +2798,7 @@ window.__gyro = {
   getMusicState: () => audio.getMusicState(),
   setMusicDistance: (distance, opts) => audio.setMusicDistance(distance, opts || {}),
   musicCutoffForDistance: (distance) => audio.musicCutoffForDistance(distance),
+  muffleMusic: (seconds) => audio.muffleMusic(seconds),
   musicTracks: () => audio.tracks,
   setControlMode: (mode) => setControlMode(mode),
   setElapsed: (seconds) => {

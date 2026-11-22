@@ -9,8 +9,11 @@ so the original packs, file names, authors, and source URLs stay with the game.
 
 Samples were trimmed, loudness-normalized, and recompressed for the web
 (Opus + AAC for effects; 96 kbps AAC for music). The soundtrack loops at full
-length; a low-pass filter on the music opens at each 1000 m milestone.
+length. A low-pass filter keeps the mix muffled on the start and game-over
+screens, opens at each 1000 m milestone during a run, and eases back to muffled
+over three seconds after a crash.
 
+## Sound effects
 ## Sound effects
 
 | Event | Pack | Original file | Author | License | URL |
@@ -28,10 +31,13 @@ length; a low-pass filter on the music opens at each 1000 m milestone.
 
 ## Soundtrack
 
-Each flight plays **Neon Sign Circuit** by MintoDog (CC0 1.0). The track loops
-for the whole run. At the start the highs are filtered down; every 1000 m
-(the same marks that change the tunnel palette) the low-pass cutoff steps up
-and the mix opens.
+**Neon Sign Circuit** by MintoDog (CC0 1.0) loops continuously: it starts on
+the first tap and keeps playing across the start screen, every flight, and the
+game-over screen, without restarting. On the start and stats screens the highs
+are filtered down (around 500 Hz). During a run the low-pass cutoff steps up
+every 1000 m (the same marks that change the tunnel palette) and the mix opens.
+After a crash the filter eases back to the muffled setting over about three
+seconds.
 
 | File in game | Title | Author | BPM (est.) | License | URL |
 | --- | --- | --- | --- | --- | --- |

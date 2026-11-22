@@ -23,6 +23,8 @@ const ENGINE_LEVEL = 0.11;
 export const MUSIC_CUTOFFS = [500, 1000, 2000, 4500, 9000, 20000];
 const MUSIC_FILTER_Q = 1;
 const MUSIC_FILTER_RAMP = 1.75;
+const MENU_CUTOFF = MUSIC_CUTOFFS[0];
+const DEATH_FILTER_RAMP = 3;
 
 export function musicCutoffForDistance(distance) {
   const step = Math.min(MUSIC_CUTOFFS.length - 1, Math.max(0, Math.floor((distance || 0) / 1000)));
@@ -75,6 +77,7 @@ export function createAudio() {
   let musicNode = null;
   let currentTrack = null;
   let musicPlaying = false;
+  let musicStarted = false;
   let duckTimer = 0;
 
   function ensure() {
@@ -151,6 +154,7 @@ export function createAudio() {
       // ignore
     }
     void loadSfx();
+    playMusicBed();
     return audio.state === "running" || audio.state === "suspended";
   }
 
@@ -241,9 +245,9 @@ export function createAudio() {
     engineSrc = src;
   }
 
-  function startMusic() {
+  function ensureMusicElement() {
     const audio = ensure();
-    if (!audio || !musicGain) return;
+    if (!audio || !musicFilter) return null;
     const track = MUSIC_TRACKS[0];
     currentTrack = track;
     if (!musicEl) {
@@ -259,27 +263,65 @@ export function createAudio() {
         // already connected
       }
     }
-    musicEl.pause();
     const src = `/audio/music/${track.id}.m4a`;
     if (!musicEl.src || !musicEl.src.endsWith(src)) musicEl.src = src;
-    try {
-      musicEl.currentTime = 0;
-    } catch {
-      // some browsers throw if the element is not ready
-    }
+    musicEl.loop = true;
     musicEl.muted = muted;
-    snapMusicCutoff(MUSIC_CUTOFFS[0]);
+    return musicEl;
+  }
+
+  // Start the looping bed once and keep it running. Never seeks or pauses.
+  function playMusicBed() {
+    const audio = ensure();
+    if (!audio || !musicGain) return;
+    ensureMusicElement();
+    window.clearTimeout(duckTimer);
     const now = audio.currentTime;
-    musicGain.gain.cancelScheduledValues(now);
-    musicGain.gain.setValueAtTime(0.0001, now);
-    musicGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, MUSIC_LEVEL), now + 1.15);
-    musicPlaying = true;
-    const playPromise = musicEl.play();
-    if (playPromise && typeof playPromise.catch === "function") {
-      playPromise.catch(() => {
-        musicPlaying = false;
-      });
+    if (!musicStarted) {
+      musicGain.gain.cancelScheduledValues(now);
+      musicGain.gain.setValueAtTime(0.0001, now);
+      musicGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, MUSIC_LEVEL), now + 1.15);
+      musicStarted = true;
+    } else {
+      const current = Math.max(0.0001, musicGain.gain.value);
+      musicGain.gain.cancelScheduledValues(now);
+      musicGain.gain.setValueAtTime(current, now);
+      if (current < MUSIC_LEVEL * 0.95) {
+        musicGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, MUSIC_LEVEL), now + 0.4);
+      }
     }
+    musicPlaying = true;
+    if (musicEl && musicEl.paused) {
+      const playPromise = musicEl.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {
+          musicPlaying = false;
+        });
+      }
+    }
+  }
+
+  function beginRunMusic() {
+    playMusicBed();
+    snapMusicCutoff(MENU_CUTOFF);
+  }
+
+  function muffleMusic(seconds = DEATH_FILTER_RAMP) {
+    const audio = ensure();
+    if (!audio || !musicFilter) return;
+    playMusicBed();
+    const now = audio.currentTime;
+    const current = Math.max(20, musicFilter.frequency.value);
+    musicFilter.frequency.cancelScheduledValues(now);
+    musicFilter.frequency.setValueAtTime(current, now);
+    const target = MENU_CUTOFF;
+    const ramp = Math.max(0.2, seconds);
+    if (Math.abs(current - target) < 0.5) {
+      snapMusicCutoff(target);
+      return;
+    }
+    musicFilter.frequency.exponentialRampToValueAtTime(Math.max(20, target), now + ramp);
+    musicCutoffTarget = target;
   }
 
   function snapMusicCutoff(hz) {
@@ -311,26 +353,6 @@ export function createAudio() {
     return target;
   }
 
-  function fadeMusicOut(seconds = 1.05) {
-    if (!ctx || !musicGain) return;
-    const now = ctx.currentTime;
-    const current = Math.max(0.0001, musicGain.gain.value);
-    musicGain.gain.cancelScheduledValues(now);
-    musicGain.gain.setValueAtTime(current, now);
-    musicGain.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.12, seconds));
-    window.clearTimeout(duckTimer);
-    duckTimer = window.setTimeout(() => {
-      if (musicEl) {
-        try {
-          musicEl.pause();
-        } catch {
-          // ignore
-        }
-      }
-      musicPlaying = false;
-    }, Math.ceil(seconds * 1000) + 40);
-  }
-
   function startEngine() {
     const audio = ensure();
     if (!audio) return;
@@ -342,7 +364,7 @@ export function createAudio() {
     void loadSfx().then(() => {
       if (engineOn && !engineSrc) startEngineLoop();
     });
-    startMusic();
+    beginRunMusic();
   }
 
   function stopEngine(fade = 0.9) {
@@ -402,14 +424,16 @@ export function createAudio() {
     const audio = ensure();
     if (!audio) return;
     stopEngine(1.05);
+    muffleMusic(DEATH_FILTER_RAMP);
     if (musicGain) {
       const now = audio.currentTime;
       const current = Math.max(0.0001, musicGain.gain.value);
+      // Brief duck under the crash hit, then return to the normal music level.
       musicGain.gain.cancelScheduledValues(now);
       musicGain.gain.setValueAtTime(current, now);
-      musicGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, MUSIC_LEVEL * 0.28), now + 0.08);
+      musicGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, MUSIC_LEVEL * 0.7), now + 0.08);
+      musicGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, MUSIC_LEVEL), now + 0.55);
     }
-    fadeMusicOut(1.15);
     if (muted) return;
     void loadSfx().then(() => playSfx("crash", { gain: 0.52, rate: 0.92 }));
   }
@@ -424,7 +448,10 @@ export function createAudio() {
       trackId: currentTrack?.id || null,
       title: currentTrack?.title || null,
       artist: currentTrack?.artist || null,
-      playing: musicPlaying && !muted,
+      playing: !!(musicEl && !musicEl.paused),
+      audible: !!(musicEl && !musicEl.paused && !muted),
+      paused: !musicEl || musicEl.paused,
+      currentTime: musicEl ? musicEl.currentTime : 0,
       src: musicEl?.src || null,
       count: MUSIC_TRACKS.length,
       cutoffHz: musicFilter ? musicFilter.frequency.value : null,
@@ -450,6 +477,8 @@ export function createAudio() {
     getMusicState,
     setMusicDistance,
     musicCutoffForDistance,
+    muffleMusic,
+    beginRunMusic,
     tracks: MUSIC_TRACKS,
   };
 }
