@@ -1,0 +1,38 @@
+# Gyro Tunnel audio credits
+
+Sound effects and music in this game come from clearly free libraries.
+Every file used here is licensed **CC0 1.0** (public-domain dedication):
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Attribution is not required under CC0. The list below is recorded as a courtesy
+so the original packs, file names, authors, and source URLs stay with the game.
+
+Samples were trimmed, loudness-normalized, and recompressed for the web
+(Opus + AAC for effects; 96 kbps AAC for music). The soundtrack loops at full
+length; a low-pass filter on the music opens at each 1000 m milestone.
+
+## Sound effects
+
+| Event | Pack | Original file | Author | License | URL |
+| --- | --- | --- | --- | --- | --- |
+| Engine / wind bed (loop, rises with speed and boost) | Kenney Sci-Fi Sounds | `Audio/spaceEngineLow_000.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/sci-fi-sounds (also https://opengameart.org/content/sci-fi-sounds) |
+| Close call whoosh (pitch rises with combo) | Kenney Sci-Fi Sounds | `Audio/laserLarge_002.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/sci-fi-sounds (also https://opengameart.org/content/sci-fi-sounds) |
+| Shield pickup | Kenney Interface Sounds | `Audio/glass_003.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/interface-sounds (also https://opengameart.org/content/interface-sounds) |
+| Slow-mo pickup | Kenney Interface Sounds | `Audio/pluck_001.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/interface-sounds (also https://opengameart.org/content/interface-sounds) |
+| 2× Score pickup | Kenney Interface Sounds | `Audio/confirmation_001.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/interface-sounds (also https://opengameart.org/content/interface-sounds) |
+| Shield absorb | Kenney Sci-Fi Sounds | `Audio/forceField_001.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/sci-fi-sounds (also https://opengameart.org/content/sci-fi-sounds) |
+| Slow-mo end | Kenney Interface Sounds | `Audio/minimize_002.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/interface-sounds (also https://opengameart.org/content/interface-sounds) |
+| 2× Score end | Kenney Interface Sounds | `Audio/back_002.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/interface-sounds (also https://opengameart.org/content/interface-sounds) |
+| Crash | Kenney Sci-Fi Sounds | `Audio/lowFrequency_explosion_000.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/sci-fi-sounds (also https://opengameart.org/content/sci-fi-sounds) |
+| Palette milestone chime | Kenney Interface Sounds | `Audio/confirmation_003.ogg` | Kenney | CC0 1.0 | https://kenney.nl/assets/interface-sounds (also https://opengameart.org/content/interface-sounds) |
+
+## Soundtrack
+
+Each flight plays **Neon Sign Circuit** by MintoDog (CC0 1.0). The track loops
+for the whole run. At the start the highs are filtered down; every 1000 m
+(the same marks that change the tunnel palette) the low-pass cutoff steps up
+and the mix opens.
+
+| File in game | Title | Author | BPM (est.) | License | URL |
+| --- | --- | --- | --- | --- | --- |
+| `audio/music/neon-sign-circuit.m4a` | Neon Sign Circuit | MintoDog | 144 | CC0 1.0 | https://opengameart.org/content/neon-sign-circuit |

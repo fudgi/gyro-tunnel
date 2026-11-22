@@ -1,0 +1,21 @@
+{
+  "hasMotion": true,
+  "targetAfterEvent": 0.8,
+  "firstFrame": {
+    "t": 32.5,
+    "roll": 0.19385954831761687,
+    "target": 0.8,
+    "rig": 0.19385954831761687,
+    "bank": -0.2333954346095972
+  },
+  "t63Roll": 130,
+  "t63Rig": 130,
+  "t63Bank": 64,
+  "predicted63": 120,
+  "tau": 0.12,
+  "bankTau": 0.05,
+  "meanSweepLag": 0.2543943705386427,
+  "predictedSweepLag": 0.24,
+  "sweepSamples": 16,
+  "stepSamples": 22
+}
